@@ -1,7 +1,16 @@
 import torch
 import torch.nn as nn
 
+
 class Simple(nn.Module):
+  """ 
+  Very simple linear torch model. Uses relu activation and\
+  one final sigmoid activation.
+
+  Parameters: 
+  hidden_size (float): number of parameters per hidden layer
+  num_hidden_layers (float): number of hidden layers
+  """
   def __init__(self, hidden_size=100, num_hidden_layers=7):
     super(Simple,self).__init__()
     layers = [nn.Linear(2, hidden_size),
@@ -19,6 +28,18 @@ class Simple(nn.Module):
 
 
 class SkipConn(nn.Module):
+  """ 
+  Linear torch model with skip connections between every hidden layer\
+  as well as the original input appended to every layer.\
+  Because of this, each hidden layer contains 2*hidden_size +2 params\
+  due to skip connections.
+  Uses relu activations and one final sigmoid activation.
+
+  Parameters: 
+  hidden_size (float): number of novel parameters per hidden layer\
+  (not including skip connections)
+  num_hidden_layers (float): number of hidden layers
+  """
   def __init__(self, hidden_size=100, num_hidden_layers=7):
     super(SkipConn,self).__init__()
     out_size = hidden_size

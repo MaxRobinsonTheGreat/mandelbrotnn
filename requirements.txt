@@ -1,0 +1,6 @@
+torch
+tqdm
+matplotlib
+imageio
+imageio-ffmpeg
+numpy

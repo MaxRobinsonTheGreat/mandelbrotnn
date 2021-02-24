@@ -1,12 +1,26 @@
 import torch
-import models
-from dataset import MandelbrotDataSet
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from videomaker import VideoMaker, modelGenerate
+
 
 def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemodelas='autosave.pt', vm=None):
+    """ 
+    Trains the given model on the given dataset for the given number of epochs. Can save the model and
+    capture training videos as it goes. 
+
+    Parameters: 
+    model (torch.nn.Module): torch model with 2 inputs and 1 output. Will mutate this object.
+    dataset (torch.utils.data.Dataset): torch dataset
+    epochs (int): Number of epochs to train for
+    batch_size (int): batch size for dataloader
+    use_scheduler (bool): whether or not to use the simple StepLR scheduler.
+    savemodelas (string): name of the file to save the model to. If None, the\
+        model will not be saved. The model is automatically saved every epoch\
+        to allow for interruption.
+    vm (VideoMaker): used to capture training images and save them as a mp4.\
+        If None, will not save a video capture (this will increase perfomance)
+    """
     print("Initializing...")
     model = model.cuda()
     optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-10)
@@ -56,7 +70,6 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
         print("Saving...")
         torch.save(model.state_dict(), './models/'+savemodelas)
     print("Done.")
-    fig = plt.figure()
-    fig.title('Avg Loss vs Epochs')
+    plt.title("Avg. Loss vs Epochs")
     plt.plot(avg_losses)
     plt.show()
