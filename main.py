@@ -38,10 +38,3 @@ def example_render():
 
 if __name__ == "__main__":
     example_train_capture()
-
-# TODO:
-# -readmex
-# -requirementsx
-# -docstringsx
-# -remove commentsx
-# -examplesx
