@@ -6,16 +6,14 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from videomaker import VideoMaker, modelGenerate
 
-def train(model, dataset, epochs, use_scheduler, savemodelas='autosave.pt', vm=None):
+def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemodelas='autosave.pt', vm=None):
     print("Initializing...")
     model = model.cuda()
-    # optim = torch.optim.Adam(model.parameters(), lr=0.0003125, weight_decay=1e-10) # continuing training
-    # optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-10) # attempt 2
-    optim = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-10) # attempt 1
+    optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-10)
     if use_scheduler:
         scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=50, gamma=0.5)
     bne = torch.nn.BCELoss()
-    loader = DataLoader(dataset, batch_size=1000, shuffle=True)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     print('Training...')
     avg_losses = []
@@ -58,19 +56,7 @@ def train(model, dataset, epochs, use_scheduler, savemodelas='autosave.pt', vm=N
         print("Saving...")
         torch.save(model.state_dict(), './models/'+savemodelas)
     print("Done.")
+    fig = plt.figure()
+    fig.title('Avg Loss vs Epochs')
     plt.plot(avg_losses)
     plt.show()
-    # model.eval()
-    # plt.imshow(modelGenerate(model, 1088, 720))
-
-# model = models.Simple(50, 5)
-# # model.load_state_dict(torch.load('./models/excellent.pt'))
-
-# vidmaker = VideoMaker(dims=(960, 544), capture_rate=5)
-# dataset = MandelbrotDataSet(50000)
-
-# train(model, 10, dataset, vm=vidmaker)
-
-# plt.figure()
-# plt.imshow(modelGenerate(model, 1088, 720), vmin=0, vmax=1)
-# plt.show()
