@@ -4,12 +4,14 @@ from src.dataset import MandelbrotDataSet
 from src import models
 import matplotlib.pyplot as plt
 
+import torch
+
 
 def example_train():
-    model = models.Simple(50, 5)
-    dataset = MandelbrotDataSet(50000)
-    train(model, dataset, 10) # train for 10 epochs (batch size=1000)
-    plt.imshow(modelGenerate(model, 304, 304), vmin=0, vmax=1, cmap='gray')
+    model = models.Simple()
+    dataset = MandelbrotDataSet(100000)
+    train(model, dataset, 150, batch_size=10000, use_scheduler=True)
+    plt.imshow(modelGenerate(model, 1920, 1088), vmin=0, vmax=1)
     plt.show()
 
 
@@ -22,7 +24,6 @@ def example_train_capture():
 
 
 def example_render():
-
     plt.imshow(generateClassic(304, 304), vmin=0, vmax=1, cmap='gray') # 304x304 render
     plt.show()
     # 4k render: 3840, 2160
@@ -32,9 +33,14 @@ def example_render():
     # xmin  xmax  yoffset
     # -1.8  -0.9  0.2       leftmost bulb/tail
     # -0.9  -0.1  0.5       left upper shoulder of main cardioid
+    
 
-    # you can also load a model and use modelGenerate(model, same params^)
+def example_render_model():
+    # saves a 4k image
+    model = models.Simple().cuda()
+    model.load_state_dict(torch.load('./models/autosave.pt'))
+    plt.imsave("./captures/images/render.png", modelGenerate(model, 3840, 2160).squeeze(), vmin=0, vmax=1, cmap='gray')
 
 
 if __name__ == "__main__":
-    example_train_capture()
+    example_render()
