@@ -2,13 +2,16 @@ import torch
 import random
 from tqdm import tqdm
 from torch.utils.data import Dataset
+import math
 
-def m(a, max_depth):
+# function helper, don't directly call
+def _m(a, max_depth):
   z = 0
   for n in range(1, max_depth):
     z = z**2 + a
     if abs(z) > 2:
       return min((n-1)/50, 1)
+      # return -(math.cos((n-1)*math.pi/50)/2) + (1/2)
   return 1.0
 
 
@@ -27,7 +30,7 @@ def mandelbrot(x, y, max_depth=50):
   float: Number between 1 and 0 where one is in the m. set and values\
   closer to one are closer to being in the mandelbrot set
   """
-  return m(x + 1j * y, max_depth)
+  return _m(x + 1j * y, max_depth)
 
 
 class MandelbrotDataSet(Dataset):
@@ -36,8 +39,8 @@ class MandelbrotDataSet(Dataset):
   
     Parameters: 
     size (int): number of randomized points to generate
-    max_depth (int): Maximum number of recursive steps before deciding
-    whether the value is in the mandelbrot set
+    max_depth (int): Maximum number of recursive steps before deciding\
+      whether the value is in the mandelbrot set
     xmin (float): minimum x value for points
     xmax (float): maximum x value for points
     ymin (float): minimum y value for points
