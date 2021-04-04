@@ -14,18 +14,20 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
     dataset (torch.utils.data.Dataset): torch dataset
     epochs (int): Number of epochs to train for
     batch_size (int): batch size for dataloader
-    use_scheduler (bool): whether or not to use the simple StepLR scheduler.
+    use_scheduler (bool): whether or not to use the simple StepLR scheduler.\
+        Defaults to False.
     savemodelas (string): name of the file to save the model to. If None, the\
         model will not be saved. The model is automatically saved every epoch\
-        to allow for interruption.
+        to allow for interruption. Defaults to "autosave.mp4".
     vm (VideoMaker): used to capture training images and save them as a mp4.\
-        If None, will not save a video capture (this will increase perfomance)
+        If None, will not save a video capture (this will increase perfomance).\
+        Defaults to None.
     """
     print("Initializing...")
     model = model.cuda()
     optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-10)
     if use_scheduler:
-        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=20, gamma=0.5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.5)
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=1e-14)
     bne = torch.nn.BCELoss()
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -53,6 +55,8 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
             loop.set_description('epoch:{:d} Loss:{:.6f}'.format(epoch, tot_loss/(i+1)))
             loop.update(1)
             tot_iterations+=1
+            # inputs, outputs = inputs.cpu(), outputs.cpu()
+            torch.cuda.empty_cache()
         loop.close()
         avg_losses.append(tot_loss/len(loader))
 
@@ -71,6 +75,6 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
         print("Saving...")
         torch.save(model.state_dict(), './models/'+savemodelas)
     print("Done.")
-    plt.title("Avg. Loss vs Epochs")
-    plt.plot(avg_losses)
+    # plt.title("Avg. Loss vs Epochs")
+    # plt.plot(avg_losses)
     plt.show()
