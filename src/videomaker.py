@@ -33,7 +33,7 @@ def generateClassic(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50):
     return im
 
 
-def modelGenerate(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0):
+def modelGenerate(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None):
     """ 
     Generates an image of a model's predition of the mandelbrot set in 2d linear\
     space with a given resolution. Prioritizes resolution over ease of positioning,\
@@ -52,47 +52,70 @@ def modelGenerate(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0):
     numpy array: 2d float array representing an image 
     """
     with torch.no_grad():
-        iteration = (xmax-xmin)/resx
-        X = torch.arange(xmin, xmax, iteration).cuda()
-        y_max = iteration * resy/2
-        Y = torch.arange(-y_max-yoffset,  y_max-yoffset, iteration)
-        im = []
         # slices each row of the image into batches to be fed into the nn.
         # can be accelerated by putting the entire image in a single batch
         # and resizing, but 4k renders do not fit on my gpu :(
-        for y in Y:
-            ys = torch.ones(len(X)).cuda() * y
-            points = torch.stack([X, ys], 1)
-            out = model(points)
-            im.append(out)
-        im = torch.stack(im, 0)
-        im = torch.clamp(im, 0, 1) # doesn't add weird pure white artifacts
-        return im.cpu().numpy()
+        model.eval()
+        if linspace is None:
+            linspace = generateLinspace(resx, resy, xmin, xmax, yoffset)
+        
+        linspace = linspace.cuda()
+        
+        im_slices = []
+        for points in linspace:
+            im_slices.append(model(points))
+        im = torch.stack(im_slices, 0)
+        
+        # if linspace.shape != (resx*resy, 2):
+        #     linspace = torch.reshape(linspace, (resx*resy, 2))
+        # im = model(linspace).squeeze()
+        # im = torch.reshape(im, (resy, resx))
 
+
+        im = torch.clamp(im, 0, 1) # doesn't add weird pure white artifacts
+        linspace = linspace.cpu()
+        torch.cuda.empty_cache()
+        model.train()
+        return im.squeeze().cpu().numpy()
+
+
+def generateLinspace(resx, resy, xmin=-2.4, xmax=1, yoffset=0):
+    iteration = (xmax-xmin)/resx
+    X = torch.arange(xmin, xmax, iteration).cuda()
+    y_max = iteration * resy/2
+    Y = torch.arange(-y_max-yoffset,  y_max-yoffset, iteration)
+    linspace = []
+    for y in Y:
+        ys = torch.ones(len(X)).cuda() * y
+        points = torch.stack([X, ys], 1)
+        linspace.append(points)
+    return torch.stack(linspace, 0)
 
 class VideoMaker:
     """ 
     Opens a file writer to begin saving generated model images during training. 
-    NOTE: Must call .finish() to close file writer.
+    NOTE: Must call `.finish()` to close file writer.
 
     Parameters: 
     filename (string): Name to save the file to 
     fps (int): FPS to save the final mp4 to
     dims (tuple(int, int)): x y resolution to generate images at. For best results,\
         use values divisible by 16.
-    capture_rate (int): read by the train() to add a frame after this many batches
+    capture_rate (int): batches per frame
     """
     def __init__(self, filename='autosave.mp4', fps=30, dims=(100, 100), capture_rate=10):
         self.writer = imageio.get_writer('./captures/'+filename, fps=fps)
         self.dims=dims
         self.capture_rate=capture_rate
+        self.linspace = generateLinspace(self.dims[0], self.dims[1])
+        self.linspace = torch.reshape(self.linspace, (dims[0]*dims[1], 2))
 
     def generateFrame(self, model):
         """
         Generates a single frame using `modelGenerate` with the given model
         """
         model.eval()
-        im = modelGenerate(model, self.dims[0], self.dims[1])
+        im = modelGenerate(model, self.dims[0], self.dims[1], linspace=self.linspace)
         model.train()
         self.writer.append_data(np.uint8(im*255))
 
