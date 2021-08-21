@@ -1,46 +1,58 @@
-from src.videomaker import generateClassic, modelGenerate, VideoMaker
+from src.videomaker import renderMandelbrot, renderModel, VideoMaker
 from src.training import train
 from src.dataset import MandelbrotDataSet
 from src import models
 import matplotlib.pyplot as plt
 
-import torch
-
-
-def example_train():
-    model = models.Simple()
-    dataset = MandelbrotDataSet(100000)
-    train(model, dataset, 150, batch_size=10000, use_scheduler=True)
-    plt.imshow(modelGenerate(model, 1920, 1088), vmin=0, vmax=1)
-    plt.show()
-
-
-def example_train_capture():
-    # save training capture to captures/autosave.mp4
-    vidmaker = VideoMaker(dims=(960, 544), capture_rate=5)
-    model = models.SkipConn(50, 5)
-    dataset = MandelbrotDataSet(50000)
-    train(model, dataset, 5, vm=vidmaker)
-
 
 def example_render():
-    plt.imshow(generateClassic(304, 304), vmin=0, vmax=1, cmap='gray') # 304x304 render
+    image = renderMandelbrot(304, 304, yoffset=0, max_depth=100) # 304x304 render
+    plt.imshow(image, vmin=0, vmax=1, cmap='inferno')
     plt.show()
     # 4k render: 3840, 2160
     # 1080p render: 1920, 1088
+    # 960, 544
+    # 480, 272
 
-    # zoom into useful locations:
+    # pass the following params to renderMandelbrot to zoom into useful locations:
     # xmin  xmax  yoffset
     # -1.8  -0.9  0.2       leftmost bulb/tail
     # -0.9  -0.1  0.5       left upper shoulder of main cardioid
+
+
+def example_train():
+    print("Initializing model...")
     
+    model = models.Simple(150, 10).cuda() # see src.models for more models
+
+    # show the space before we've learned anything
+    plt.imshow(renderModel(model, 600, 600), vmin=0, vmax=1, cmap='inferno')
+    plt.show()
+
+    dataset = MandelbrotDataSet(200000) # generate a dataset with 200000 random training points
+
+    train(model, dataset, 10, batch_size=10000, use_scheduler=True) # train for 20 epochs
+
+    # show the space again
+    plt.imshow(renderModel(model, 600, 600), cmap='inferno')
+    plt.show()
+
 
 def example_render_model():
     # saves a 4k image
     model = models.Simple().cuda()
-    model.load_state_dict(torch.load('./models/autosave.pt'))
-    plt.imsave("./captures/images/render.png", modelGenerate(model, 3840, 2160).squeeze(), vmin=0, vmax=1, cmap='gray')
+    # model.load_state_dict(torch.load('./models/autosave.pt')) # you need to have a model with this name
+    plt.imsave("./captures/images/render.png", renderModel(model, 3840, 2160), vmin=0, vmax=1, cmap='gray')
+
+
+def example_train_capture():
+    # we will caputre 480x480 video with new frame every 3 epochs
+    vidmaker = VideoMaker(dims=(480, 480), capture_rate=3)
+
+    model = models.Simple()
+    dataset = MandelbrotDataSet(100000)
+    train(model, dataset, 10, batch_size=8000, vm=vidmaker)
 
 
 if __name__ == "__main__":
-    example_render()
+    example_train_capture()

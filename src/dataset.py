@@ -27,8 +27,8 @@ def mandelbrot(x, y, max_depth=50):
 
 
   Returns: 
-  float: Number between 1 and 0 where one is in the m. set and values\
-  closer to one are closer to being in the mandelbrot set
+  float: Number between 1 and 0 where 1.0 is in the mandelbrot set and\
+  values closer to 1.0 required more steps to determine this
   """
   return _m(x + 1j * y, max_depth)
 

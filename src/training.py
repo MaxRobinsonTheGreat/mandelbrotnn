@@ -28,6 +28,8 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
     optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-10)
     if use_scheduler:
         scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.5)
+        # I have experimented with other supposedly better schedulers before, they don't work as well
+        # try this one if you'd like:
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=1e-14)
     bne = torch.nn.BCELoss()
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -55,7 +57,7 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
             loop.set_description('epoch:{:d} Loss:{:.6f}'.format(epoch, tot_loss/(i+1)))
             loop.update(1)
             tot_iterations+=1
-            # inputs, outputs = inputs.cpu(), outputs.cpu()
+            inputs, outputs = inputs.cpu(), outputs.cpu()
             torch.cuda.empty_cache()
         loop.close()
         avg_losses.append(tot_loss/len(loader))
@@ -70,11 +72,9 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
     if vm is not None:
         print("Finalizing capture...")
         vm.generateFrame(model)
-        vm.finish()
+        vm.close()
     if savemodelas is not None:
         print("Saving...")
         torch.save(model.state_dict(), './models/'+savemodelas)
     print("Done.")
-    # plt.title("Avg. Loss vs Epochs")
-    # plt.plot(avg_losses)
     plt.show()
