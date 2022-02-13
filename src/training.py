@@ -2,9 +2,11 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import math
+from src.videomaker import renderModel
 
 
-def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemodelas='autosave.pt', vm=None):
+def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversample=0, savemodelas='autosave.pt', snapshots_every=-1, vm=None):
     """ 
     Trains the given model on the given dataset for the given number of epochs. Can save the model and
     capture training videos as it goes. 
@@ -25,23 +27,27 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
     """
     print("Initializing...")
     model = model.cuda()
-    optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-10)
+    optim = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     if use_scheduler:
-        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=10, gamma=0.5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=5, gamma=0.5)
         # I have experimented with other supposedly better schedulers before, they don't work as well
         # try this one if you'd like:
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optim, T_max=10, eta_min=1e-14)
-    bne = torch.nn.BCELoss()
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    # bne = torch.nn.BCELoss()
+    
+    if oversample != 0:
+        per_batch = math.floor(batch_size * oversample)
+        dataset.start_oversample(math.floor(len(dataset) * oversample))
     
     print('Training...')
     avg_losses = []
     tot_iterations = 0
     for epoch in range(epochs):
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         loop = tqdm(total=len(loader), position=0)
         tot_loss = 0
 
-        for i, (inputs, outputs) in enumerate(loader):
+        for i, (inputs, outputs, indices) in enumerate(loader):
             if vm is not None and tot_iterations%vm.capture_rate==0:
                 vm.generateFrame(model)
             inputs, outputs = inputs.cuda(), outputs.cuda()
@@ -49,7 +55,23 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
             optim.zero_grad()
 
             pred = model(inputs).squeeze()
-            loss = bne(pred.float(), outputs.float())
+            pred, outputs = pred.float(), outputs.float()
+            
+            all_losses = (outputs - pred)**2
+            # all_losses = torch.sqrt(torch.abs(pred - outputs))
+            # all_losses = (-2/(2**(outputs - pred)**2)) + 2
+
+            if oversample != 0:
+                size = per_batch if per_batch < len(all_losses) else len(all_losses)
+                highest_loss = torch.topk(all_losses, size)
+                selected_indices = highest_loss[1]
+                dataset.add_oversample(indices[selected_indices])
+
+            # loss = bne(pred.float(), outputs.float())
+            # loss = torch.mean(torch.abs(pred - outputs))
+            loss = torch.mean(all_losses)
+            # loss = torch.mean(2 * (1-(1/(torch.abs(outputs - pred)+1))))
+            # loss = torch.mean(torch.sqrt(torch.abs(outputs**2 - pred**2)))
             loss.backward()
             optim.step()
             tot_loss += loss.item()
@@ -64,9 +86,12 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, savemode
 
         if use_scheduler:
             scheduler.step()
+        dataset.update_oversample()
         
         if savemodelas is not None:
             torch.save(model.state_dict(), './models/'+savemodelas)
+        if snapshots_every != -1 and epoch%snapshots_every == 0:
+            plt.imsave('./captures/images/snapshot.png', renderModel(model, 1280, 720), vmin=0, vmax=1, cmap='inferno')
     print("Finished training.")
 
     if vm is not None:
