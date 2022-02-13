@@ -23,9 +23,9 @@ def renderMandelbrot(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50):
     numpy array: 2d float array representing an image 
     """
     iteration = (xmax-xmin)/resx
-    X = np.arange(xmin, xmax, iteration)
+    X = np.arange(xmin, xmax, iteration)[:resx]
     y_max = iteration * resy/2
-    Y = np.arange(-y_max-yoffset,  y_max-yoffset, iteration)
+    Y = np.arange(-y_max-yoffset,  y_max-yoffset, iteration)[:resy]
     im = np.zeros((resy,resx))
     for j, x in enumerate(tqdm(X)):
         for i, y in enumerate(Y):
@@ -86,15 +86,16 @@ def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, 
 
 def generateLinspace(resx, resy, xmin=-2.4, xmax=1, yoffset=0):
     iteration = (xmax-xmin)/resx
-    X = torch.arange(xmin, xmax, iteration).cuda()
+    X = torch.arange(xmin, xmax, iteration).cuda()[:resx]
     y_max = iteration * resy/2
-    Y = torch.arange(-y_max-yoffset,  y_max-yoffset, iteration)
+    Y = torch.arange(-y_max-yoffset,  y_max-yoffset, iteration)[:resy]
     linspace = []
     for y in Y:
         ys = torch.ones(len(X)).cuda() * y
         points = torch.stack([X, ys], 1)
         linspace.append(points)
     return torch.stack(linspace, 0)
+
 
 class VideoMaker:
     """ 
@@ -108,23 +109,40 @@ class VideoMaker:
         use values divisible by 16.
     capture_rate (int): batches per frame
     """
-    def __init__(self, filename='autosave.mp4', fps=30, dims=(100, 100), capture_rate=10, max_gpu=False):
+    def __init__(self, filename='autosave.mp4', fps=30, dims=(100, 100), capture_rate=10, shots=None, max_gpu=False):
         self.writer = imageio.get_writer('./captures/'+filename, fps=fps)
         self.dims=dims
         self.capture_rate=capture_rate
-        self.linspace = generateLinspace(self.dims[0], self.dims[1])
         self.max_gpu = max_gpu
+        self._xmin = -2.4
+        self._xmax = 1
+        self._yoffset = 0
+        self.shots = shots
+
+        self.linspace = generateLinspace(self.dims[0], self.dims[1], self._xmin, self._xmax, self._yoffset)
         if max_gpu:
             self.linspace = torch.reshape(self.linspace, (dims[0]*dims[1], 2))
 
+        self.frame_count = 0
+
+
+
     def generateFrame(self, model):
         """
-        Generates a single frame using `renderModel` with the given model
+        Generates a single frame using `renderModel` with the given model and appends it to the mp4
         """
-        model.eval()
+        # if self.shots is not None and len(self.shots) > 0 and self.frame_count >= self.shots[0][0]:
+        #     shot = self.shots.pop(0)
+        #     self._xmin = shot[1]
+        #     self._xmax = shot[2]
+        #     self._yoffset = shot[3]
+        #     self.linspace = generateLinspace(self.dims[0], self.dims[1], self._xmin, self._xmax, self._yoffset)
+
+        # model.eval()
         im = renderModel(model, self.dims[0], self.dims[1], linspace=self.linspace, max_gpu=self.max_gpu)
-        model.train()
+        # model.train()
         self.writer.append_data(np.uint8(im*255))
+        self.frame_count += 1
 
     def close(self):
         self.writer.close()
