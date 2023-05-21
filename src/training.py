@@ -27,7 +27,7 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
     """
     print("Initializing...")
     model = model.cuda()
-    optim = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
+    optim = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)
     if use_scheduler:
         scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=5, gamma=0.5)
         # I have experimented with other supposedly better schedulers before, they don't work as well
@@ -57,9 +57,9 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
             pred = model(inputs).squeeze()
             pred, outputs = pred.float(), outputs.float()
             
-            all_losses = (outputs - pred)**2
+            # all_losses = (outputs - pred)**2
             # all_losses = torch.sqrt(torch.abs(pred - outputs))
-            # all_losses = (-2/(2**(outputs - pred)**2)) + 2
+            all_losses = torch.abs(outputs - pred)
 
             if oversample != 0:
                 size = per_batch if per_batch < len(all_losses) else len(all_losses)
@@ -93,6 +93,7 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
         if snapshots_every != -1 and epoch%snapshots_every == 0:
             plt.imsave('./captures/images/snapshot.png', renderModel(model, 1280, 720), vmin=0, vmax=1, cmap='inferno')
     print("Finished training.")
+    print("Final learning rate:", scheduler.get_last_lr()[0])
 
     if vm is not None:
         print("Finalizing capture...")

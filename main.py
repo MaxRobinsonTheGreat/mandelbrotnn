@@ -7,9 +7,11 @@ import torch
 
 
 def example_render():
-    image = renderMandelbrot(1920, 1088, max_depth=50) # 304x304 render
-    plt.imshow(image, vmin=0, vmax=1, cmap='inferno')
-    plt.show()
+    image = renderMandelbrot(1280, 720, -0.175,  -0.125, 1.033, max_depth=500) # 304x304 render
+    plt.imsave('./captures/images/tinymandelbrot.png', image, vmin=0, vmax=1, cmap='inferno')
+    # plt.imshow(image, vmin=0, vmax=1, cmap='inferno')
+    # plt.show()
+    # 8k 7680, 4320
     # 4k render: 3840, 2160
     # 1080p render: 1920, 1088
     # 960, 544
@@ -54,33 +56,38 @@ def example_render_model():
 def example_train_capture():
     # we will caputre 480x480 video with new frame every 3 epochs
     shots = [
-        (300, -2,  -1.2,  0.),
-        (449, -2.5, 1, 0),
-        (450, -1.8,  -0.9,  0.2),
-        (549, -2.5, 1, 0),
-        (550, -0.9,  -0.1,  0.5),
-        (700, -2.5, 1, 0),
+        (200, -2.5, 1, 0, 8),
+        (10000, -2.5, 1, 0, 16),
     ]
     shots=None
     vidmaker = VideoMaker(dims=(1280, 720),  capture_rate=1, shots=shots, max_gpu=True)
     vidmaker = None
  
-    model = models.SkipConn(200, 10)
+    linmap = models.CenteredLinearMap(x_size=10, y_size=10)
+    # linmap = models.CenteredLinearMap(size=torch.pi*2)
+    # linmap = None
+
+    model = models.SkipConn(150, 10, linmap=linmap)
     # model.load_state_dict(torch.load('./models/autosave.pt'))
     # model = models.Simple(300, 30)
-    # model = models.Fourier(32, 138, 20)
+    # model = models.Fourier(32, 138, 20, linmap=linmap)
     # model.usePreprocessing()
-    # dataset = MandelbrotDataSet(2000000, max_depth=50)
-    dataset = MandelbrotDataSet(loadfile='8mil_inv')
+    # dataset = MandelbrotDataSet(1000000, max_depth=100)
+    dataset = MandelbrotDataSet(loadfile='1mil_inv')
     # dataset = MandelbrotDataSet(loadfile='500k_inv')
-    train(model, dataset, 10, batch_size=16000, use_scheduler=True, oversample=0.2, snapshots_every=1, vm=vidmaker)
+
+
+    train(model, dataset, 10, batch_size=8000, 
+        use_scheduler=True, oversample=0.0,
+        snapshots_every=1, vm=vidmaker)
 
 
 def create_dataset():
-    dataset = MandelbrotDataSet(8000000, max_depth=150)
-    dataset.save('8mil_inv')
+    dataset = MandelbrotDataSet(1000000, max_depth=150)
+    dataset.save('1mil_inv')
 
 if __name__ == "__main__":
     # create_dataset()
-    example_train_capture()
+    # example_train_capture()
     # example_render_model()
+    example_render()

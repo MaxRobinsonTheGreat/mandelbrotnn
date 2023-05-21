@@ -110,7 +110,7 @@ class VideoMaker:
     capture_rate (int): batches per frame
     """
     def __init__(self, filename='autosave.mp4', fps=30, dims=(100, 100), capture_rate=10, shots=None, max_gpu=False):
-        self.writer = imageio.get_writer('./captures/'+filename, fps=fps)
+        self.writer = imageio.get_writer('./captures/'+filename, fps=fps, quality=9)
         self.dims=dims
         self.capture_rate=capture_rate
         self.max_gpu = max_gpu
@@ -131,12 +131,14 @@ class VideoMaker:
         """
         Generates a single frame using `renderModel` with the given model and appends it to the mp4
         """
-        # if self.shots is not None and len(self.shots) > 0 and self.frame_count >= self.shots[0][0]:
-        #     shot = self.shots.pop(0)
-        #     self._xmin = shot[1]
-        #     self._xmax = shot[2]
-        #     self._yoffset = shot[3]
-        #     self.linspace = generateLinspace(self.dims[0], self.dims[1], self._xmin, self._xmax, self._yoffset)
+        if self.shots is not None and len(self.shots) > 0 and self.frame_count >= self.shots[0][0]:
+            shot = self.shots.pop(0)
+            self._xmin = shot[1]
+            self._xmax = shot[2]
+            self._yoffset = shot[3]
+            if len(shot) > 4:
+                self.capture_rate=shot[4]
+            self.linspace = generateLinspace(self.dims[0], self.dims[1], self._xmin, self._xmax, self._yoffset)
 
         # model.eval()
         im = renderModel(model, self.dims[0], self.dims[1], linspace=self.linspace, max_gpu=self.max_gpu)
