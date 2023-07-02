@@ -1,11 +1,12 @@
-import imageio
-from src.dataset import mandelbrot
+import imageio, os, torch
+from src.dataset import mandelbrot, smoothMandelbrot, mandelbrotGPU, mandelbrotTensor
 from tqdm import tqdm
-import torch
 import numpy as np
+import matplotlib.pyplot as plt
 
+os.makedirs("./captures/images", exist_ok=True)
 
-def renderMandelbrot(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50):
+def renderMandelbrot(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50, gpu=False):
     """ 
     Generates an image of the true mandelbrot set in 2d linear space with a given resolution.\
     Prioritizes resolution over ease of positioning, so the resolution is always preserved\
@@ -18,19 +19,24 @@ def renderMandelbrot(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50):
     xmax (float): maximum x value in the 2d space
     yoffset (float): how much to shift the y position
     max_depth (int): max depth param for mandelbrot function
-
+/
     Returns: 
     numpy array: 2d float array representing an image 
     """
-    iteration = (xmax-xmin)/resx
-    X = np.arange(xmin, xmax, iteration)[:resx]
-    y_max = iteration * resy/2
-    Y = np.arange(-y_max-yoffset,  y_max-yoffset, iteration)[:resy]
-    im = np.zeros((resy,resx))
-    for j, x in enumerate(tqdm(X)):
-        for i, y in enumerate(Y):
-            im[i, j] = mandelbrot(x, y, max_depth)
-    return im
+    step_size = (xmax-xmin)/resx
+    y_start = step_size * resy/2
+    ymin = -y_start-yoffset
+    ymax = y_start-yoffset
+    if not gpu:
+        X = np.arange(xmin, xmax, step_size)[:resx]
+        Y = np.arange(ymin,  ymax, step_size)[:resy]
+        im = np.zeros((resy,resx))
+        for j, x in enumerate(tqdm(X)):
+            for i, y in enumerate(Y):
+                im[i, j] = mandelbrot(x, y, max_depth)
+        return im
+    else:
+        return mandelbrotGPU(resx, resy, xmin, xmax, ymin, ymax, max_depth).cpu().numpy()
 
 
 def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, max_gpu=False):
@@ -95,6 +101,12 @@ def generateLinspace(resx, resy, xmin=-2.4, xmax=1, yoffset=0):
         points = torch.stack([X, ys], 1)
         linspace.append(points)
     return torch.stack(linspace, 0)
+    # X = torch.linspace(xmin, xmax, resx, device='cuda', dtype=dtype)
+    # Y = torch.linspace(-y_max-yoffset,  y_max-yoffset, resy, device='cuda', dtype=dtype)
+
+	# # Create the meshgrid using real and imaginary ranges
+    # grid = torch.stack(torch.meshgrid(Y, X), -1)
+    # return grid.view(-1, 2)
 
 
 class VideoMaker:
@@ -109,8 +121,8 @@ class VideoMaker:
         use values divisible by 16.
     capture_rate (int): batches per frame
     """
-    def __init__(self, filename='autosave.mp4', fps=30, dims=(100, 100), capture_rate=10, shots=None, max_gpu=False):
-        self.writer = imageio.get_writer('./captures/'+filename, fps=fps, quality=9)
+    def __init__(self, name='autosave', fps=30, dims=(100, 100), capture_rate=10, shots=None, max_gpu=False, cmap='magma'):
+        self.name = name
         self.dims=dims
         self.capture_rate=capture_rate
         self.max_gpu = max_gpu
@@ -118,6 +130,9 @@ class VideoMaker:
         self._xmax = 1
         self._yoffset = 0
         self.shots = shots
+        self.cmap = cmap
+        self.fps = fps
+        os.makedirs(f'./frames/{self.name}', exist_ok=True)
 
         self.linspace = generateLinspace(self.dims[0], self.dims[1], self._xmin, self._xmax, self._yoffset)
         if max_gpu:
@@ -125,26 +140,23 @@ class VideoMaker:
 
         self.frame_count = 0
 
-
-
     def generateFrame(self, model):
         """
         Generates a single frame using `renderModel` with the given model and appends it to the mp4
         """
-        if self.shots is not None and len(self.shots) > 0 and self.frame_count >= self.shots[0][0]:
+        if self.shots is not None and len(self.shots) > 0 and self.frame_count >= self.shots[0]['frame']:
             shot = self.shots.pop(0)
-            self._xmin = shot[1]
-            self._xmax = shot[2]
-            self._yoffset = shot[3]
+            self._xmin = shot["xmin"]
+            self._xmax = shot["xmax"]
+            self._yoffset = shot["yoffset"]
             if len(shot) > 4:
-                self.capture_rate=shot[4]
+                self.capture_rate=shot["capture_rate"]
             self.linspace = generateLinspace(self.dims[0], self.dims[1], self._xmin, self._xmax, self._yoffset)
 
         # model.eval()
         im = renderModel(model, self.dims[0], self.dims[1], linspace=self.linspace, max_gpu=self.max_gpu)
-        # model.train()
-        self.writer.append_data(np.uint8(im*255))
+        plt.imsave(f'./frames/{self.name}/{self.frame_count:05d}.png', im, cmap=self.cmap)
         self.frame_count += 1
 
-    def close(self):
-        self.writer.close()
+    def generateVideo(self):
+        os.system(f'ffmpeg -y -r {self.fps} -i ./frames/{self.name}/%05d.png -c:v libx264 -preset veryslow -crf 0 -pix_fmt yuv420p ./frames/{self.name}/{self.name}.mp4')
