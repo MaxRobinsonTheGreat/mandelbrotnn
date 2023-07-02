@@ -1,4 +1,4 @@
-import imageio, os, torch
+import os, torch
 from src.dataset import mandelbrot, smoothMandelbrot, mandelbrotGPU, mandelbrotTensor
 from tqdm import tqdm
 import numpy as np
