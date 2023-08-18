@@ -104,7 +104,7 @@ def generateLinspace(resx, resy, xmin=-2.4, xmax=1, yoffset=0):
     # X = torch.linspace(xmin, xmax, resx, device='cuda', dtype=dtype)
     # Y = torch.linspace(-y_max-yoffset,  y_max-yoffset, resy, device='cuda', dtype=dtype)
 
-	# # Create the meshgrid using real and imaginary ranges
+    # # Create the meshgrid using real and imaginary ranges
     # grid = torch.stack(torch.meshgrid(Y, X), -1)
     # return grid.view(-1, 2)
 
