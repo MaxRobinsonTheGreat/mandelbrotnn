@@ -44,7 +44,7 @@ class SkipConn(nn.Module):
 		out_size = hidden_size
 
 		self.inLayer = nn.Linear(init_size, out_size)
-		self.relu = nn.LeakyReLU()
+		self.relu = nn.GELU()
 		hidden = []
 		for i in range(num_hidden_layers):
 			in_size = out_size*2 + init_size if i>0 else out_size + init_size
@@ -130,7 +130,7 @@ class CenteredLinearMap():
 			y_m = y_size/(ymax - ymin)
 		else: 
 			y_m = 1.
-		x_b = -(xmin + xmax)*x_m/2 - 1 # TODO REMOVE!
+		x_b = -(xmin + xmax)*x_m/2
 		y_b = -(ymin + ymax)*y_m/2
 		self.m = torch.tensor([x_m, y_m], dtype=torch.float)
 		self.b = torch.tensor([x_b, y_b], dtype=torch.float)
