@@ -2,6 +2,15 @@ import torch
 import torch.nn as nn
 import math
 
+class Binary(nn.Module):
+    def __init__(self):
+        super(Binary, self).__init__()
+    
+    def forward(self, x):
+        x[x>=0] = 1
+        x[x<0] = -1
+        return x
+
 class Simple(nn.Module):
 	""" 
 	Very simple linear torch model. Uses relu activation and\
@@ -11,13 +20,13 @@ class Simple(nn.Module):
 	hidden_size (float): number of parameters per hidden layer
 	num_hidden_layers (float): number of hidden layers
 	"""
-	def __init__(self, hidden_size=100, num_hidden_layers=7, init_size=2):
+	def __init__(self, hidden_size=100, num_hidden_layers=7, init_size=2, activation=nn.GELU):
 		super(Simple,self).__init__()
 		layers = [nn.Linear(init_size, hidden_size),
-							nn.ReLU()]
+							activation()]
 		for _ in range(num_hidden_layers):
 			layers.append(nn.Linear(hidden_size, hidden_size))
-			layers.append(nn.ReLU())
+			layers.append(activation())
 		layers.append(nn.Linear(hidden_size, 1))
 		# layers.append(nn.Sigmoid())
 		self.tanh = nn.Tanh()
@@ -31,7 +40,7 @@ class SkipConn(nn.Module):
 	""" 
 	Linear torch model with skip connections between every hidden layer\
 	as well as the original input appended to every layer.\
-	Because of this, each hidden layer contains `2*hidden_size+2` params\
+	Because of this, each hidden layer contains `2*hidden_size+init_size` params\
 	due to skip connections.
 	Uses relu activations and one final sigmoid activation.
 
@@ -39,12 +48,12 @@ class SkipConn(nn.Module):
 	hidden_size (float): number of non-skip parameters per hidden layer
 	num_hidden_layers (float): number of hidden layers
 	"""
-	def __init__(self, hidden_size=100, num_hidden_layers=7, init_size=2, linmap=None):
+	def __init__(self, hidden_size=100, num_hidden_layers=7, init_size=2, linmap=None, activation=nn.GELU):
 		super(SkipConn,self).__init__()
 		out_size = hidden_size
 
 		self.inLayer = nn.Linear(init_size, out_size)
-		self.relu = nn.GELU()
+		self.activation = activation()
 		hidden = []
 		for i in range(num_hidden_layers):
 			in_size = out_size*2 + init_size if i>0 else out_size + init_size
@@ -58,12 +67,12 @@ class SkipConn(nn.Module):
 	def forward(self, x):
 		if self._linmap:
 			x = self._linmap.map(x)
-		cur = self.relu(self.inLayer(x))
+		cur = self.activation(self.inLayer(x))
 		prev = torch.tensor([]).cuda()
 		for layer in self.hidden:
 			combined = torch.cat([cur, prev, x], 1)
 			prev = cur
-			cur = self.relu(layer(combined))
+			cur = self.activation(layer(combined))
 		y = self.outLayer(torch.cat([cur, prev, x], 1))
 		return (self.tanh(y)+1)/2 # hey I think this works slightly better
 		# return self.sig(y)
@@ -71,7 +80,7 @@ class SkipConn(nn.Module):
 
 
 class Fourier(nn.Module):
-	def __init__(self, fourier_order=4, hidden_size=100, num_hidden_layers=7, linmap=None):
+	def __init__(self, fourier_order=4, hidden_size=100, num_hidden_layers=7, linmap=None, activation=nn.GELU):
 		""" 
 		Linear torch model that adds Fourier Features to the initial input x as \
 		sin(x) + cos(x), sin(2x) + cos(2x), sin(3x) + cos(3x), ...
@@ -85,7 +94,8 @@ class Fourier(nn.Module):
 		"""
 		super(Fourier,self).__init__()
 		self.fourier_order = fourier_order
-		self.inner_model = SkipConn(hidden_size, num_hidden_layers, fourier_order*4 + 2)
+		self.inner_model = SkipConn(hidden_size, num_hidden_layers, fourier_order*4 + 2, activation=activation)
+		# self.inner_model = Simple(hidden_size, num_hidden_layers, fourier_order*4 + 2, activation=activation)
 		self._linmap = linmap
 		self.orders = torch.arange(1, fourier_order + 1).float().to('cuda')
 
