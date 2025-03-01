@@ -39,7 +39,7 @@ def renderMandelbrot(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50, gpu
         return mandelbrotGPU(resx, resy, xmin, xmax, ymin, ymax, max_depth).cpu().numpy()
 
 
-def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, max_gpu=False):
+def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, max_gpu=False, keep_cuda=False):
     """ 
     Generates an image of a model's predition of the mandelbrot set in 2d linear\
     space with a given resolution. Prioritizes resolution over ease of positioning,\
@@ -58,12 +58,16 @@ def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, 
         (resx*resy, 2). Default None, and a new linspace will be generated automatically.
     max_gpu (boolean): if True, the entire linspace will be squeezed into a single batch. 
         Requires decent gpu memory size and is significantly faster.
+    keep_cuda (boolean): if True, the output and linspace will not be removed from the gpu and will be returned as cuda tensors.
 
     Returns: 
-    numpy array: 2d float array representing an image 
+    numpy array: 2d float array representing an image
+    OR IF KEEP_CUDA IS TRUE:
+    torch.tensor: 2d float tensor representing an image
     """
     with torch.no_grad():
         model.eval()
+
         if linspace is None:
             linspace = generateLinspace(resx, resy, xmin, xmax, yoffset)
         
@@ -84,10 +88,14 @@ def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, 
 
 
         im = torch.clamp(im, 0, 1) # doesn't add weird pure white artifacts
-        linspace = linspace.cpu()
-        torch.cuda.empty_cache()
         model.train()
-        return im.squeeze().cpu().numpy()
+        im = im.squeeze()
+        if not keep_cuda:
+            im = im.cpu().numpy()
+            linspace = linspace.cpu()
+            torch.cuda.empty_cache()
+        return im
+
 
 
 def generateLinspace(resx, resy, xmin=-2.4, xmax=1, yoffset=0):
