@@ -41,7 +41,7 @@ def renderMandelbrot(resx, resy, xmin=-2.4, xmax=1, yoffset=0, max_depth=50, gpu
 
 def renderModel(model, resx, resy, xmin=-2.4, xmax=1, yoffset=0, linspace=None, max_gpu=False):
     """ 
-    Generates an image of a model's predition of the mandelbrot set in 2d linear\
+    Generates an image of a model's prediction of the mandelbrot set in 2d linear\
     space with a given resolution. Prioritizes resolution over ease of positioning,\
     so the resolution is always preserved and the y range cannot be directly tuned.
 

@@ -52,3 +52,6 @@ if __name__ == "__main__":
     main()
     # python3 FractalZoom.py 3840 2160 6000 --xmin -1.86520494 --xmax 1.53479506 --yoffset 1.039049255 --max_depth 1500 --zoom_speed 0.0025 --video_name 4k_zoom
     # python3 FractalZoom.py 3840 2160 50 --xmin -1.86520494 --xmax 1.53479506 --yoffset 1.039049255 --max_depth 1500 --zoom_speed 0.01 --video_name test2
+    # python3 FractalZoom.py 960 544 2000 --xmin -2.417156607 --xmax -0.417156607 --yoffset 0.0 --max_depth 500 --zoom_speed 0.0025 --video_name zoom_comparison_real
+    # python3 FractalZoom.py 960 544 30 --xmin -3.48318785 --xmax 0.516812146 --yoffset 0.0 --max_depth 1500 --zoom_speed 0.25 --video_name 4k_zoom2
+

@@ -1,7 +1,8 @@
 import torch
-from sklearn.svm import SVR
+from sklearn.svm import SVR, SVC
 from sklearn.metrics import mean_squared_error
 from src.dataset import MandelbrotDataSet
+from src.imageDataset import ImageDataset
 from sklearn.model_selection import GridSearchCV
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,13 +12,19 @@ import matplotlib.pyplot as plt
 # x = (np.random.rand(10000, 2)*2-1)*3
 # y = np.sin(x[:, 0] + x[:, 1]).reshape(-1, 1)
 
-dataset = MandelbrotDataSet(10000, max_depth=1500, gpu=True)
+# dataset = MandelbrotDataSet(10000, max_depth=1500, gpu=True)
+dataset = ImageDataset('DatasetImages/smiley_small.png')
 
-x = dataset.inputs.numpy()
-y = torch.unsqueeze(dataset.outputs, 1).numpy()
+# get all inputs and outputs from dataset
+print(len(dataset))
+x = torch.zeros((len(dataset), 2))
+y = torch.zeros((len(dataset), 1))
+for i in range(len(dataset)):
+    x[i] = dataset[i][0]
+    y[i] = dataset[i][1]
 
 # Define the model
-model = SVR(C=50, epsilon=.1, gamma='scale', kernel='rbf')
+model = SVR(C=1, epsilon=.1, gamma='scale', kernel='rbf')
 # model = SVR()
 
 # Define the grid of hyperparameters to search
@@ -36,7 +43,7 @@ print("After training, MSE: ", mean_squared_error(y, y_pred))
 
 
 # Create a grid of x, y coordinates
-x_range = np.linspace(-1, 1, 300)
+x_range = np.linspace(-1, 1, 200)
 y_range = np.linspace(-1, 1, 200)
 x_grid, y_grid = np.meshgrid(x_range, y_range)
 
@@ -60,7 +67,7 @@ fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
 # axs[0].imshow(z_grid_actual, origin='lower', extent=(0, 1, 0, 1), cmap='viridis')
 # axs[0].set_title('Actual output')
-axs[1].imshow(z_grid, origin='lower', extent=(0, 1, 0, 1), cmap='viridis')
+axs[1].imshow(z_grid, origin='lower', extent=(0, 1, 0, 1), cmap='inferno')
 axs[1].set_title('Predicted output')
 
 plt.tight_layout()

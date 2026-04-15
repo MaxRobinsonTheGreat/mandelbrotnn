@@ -11,7 +11,7 @@ class ELM(nn.Module):
         super(ELM, self).__init__()
         self.hidden_layer = nn.Linear(input_dim, hidden_dim)
         self.output_layer = nn.Linear(hidden_dim, output_dim, bias=False)
-        self.activation = nn.SELU()
+        self.activation = nn.Tanh()
 
         # Initialize hidden layer with random weights and turn off gradients
         nn.init.uniform_(self.hidden_layer.weight)
@@ -28,7 +28,7 @@ class ELM(nn.Module):
 # y = torch.unsqueeze(dataset.outputs, 1).float()
 
 
-dataset = ImageDataset('./DatasetImages/blob_small.png')
+dataset = ImageDataset('./DatasetImages/smiley_small.png')
 # set x to the input values of the dataset
 x = torch.stack([dataset[i][0] for i in range(len(dataset))])
 # set y to the output values of the dataset
@@ -36,7 +36,7 @@ y = torch.unsqueeze(torch.stack([dataset[i][1] for i in range(len(dataset))]), 1
 print(x.shape, y.shape)
 
 # Create the model
-model = ELM(2, 1000, 1)
+model = ELM(2, 10000, 1)
 
 def evaluate_model(model, x, y):
     with torch.no_grad():
@@ -69,5 +69,5 @@ resx, resy = dataset.width, dataset.height
 linspace = torch.stack(torch.meshgrid(torch.linspace(-1, 1, resx), torch.linspace(1, -1, resy)), dim=-1).cuda()
 #rotate the linspace 90 degrees
 linspace = torch.rot90(linspace, 1, (0, 1))
-plt.imshow(renderModel(model, resx=resx, resy=resy, linspace=linspace), cmap='magma', origin='lower')
+plt.imshow(renderModel(model, resx=resx, resy=resy, linspace=linspace), cmap='inferno', origin='lower')
 plt.show()

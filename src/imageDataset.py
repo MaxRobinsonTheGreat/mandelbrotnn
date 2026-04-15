@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_path):
+    def __init__(self, image_path, normalize=True):
         # Load image, convert to grayscale and scale pixel values to [0, 1]
         self.image = Image.open(image_path).convert('L')
         self.image = ToTensor()(self.image)
+        self.normalize = normalize
 
         # Get image dimensions
         self.height, self.width = self.image.shape[1:]
@@ -23,7 +24,10 @@ class ImageDataset(Dataset):
         col = idx % self.width
 
         # Scale coordinates to [-1, 1]
-        input = torch.tensor([col / (self.width / 2) - 1, (self.height-row) / (self.height / 2) - 1])
+        if self.normalize:
+            input = torch.tensor([col / (self.width / 2) - 1, (self.height-row) / (self.height / 2) - 1])
+        else:
+            input = torch.tensor([col, self.height-row], dtype=torch.float32)
 
         # Get pixel value
         output = self.image[0, row, col]
