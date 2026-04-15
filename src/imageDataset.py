@@ -11,6 +11,7 @@ class ImageDataset(Dataset):
         self.image = Image.open(image_path).convert('L')
         self.image = ToTensor()(self.image)
         self.normalize = normalize
+        self.image = torch.flip(self.image, [1])  # flip along height dimension
 
         # Get image dimensions
         self.height, self.width = self.image.shape[1:]
@@ -28,6 +29,7 @@ class ImageDataset(Dataset):
             input = torch.tensor([col / (self.width / 2) - 1, (self.height-row) / (self.height / 2) - 1])
         else:
             input = torch.tensor([col, self.height-row], dtype=torch.float32)
+        input = torch.tensor([col / (self.width / 2) - 1, row / (self.height / 2) - 1])
 
         # Get pixel value
         output = self.image[0, row, col]
