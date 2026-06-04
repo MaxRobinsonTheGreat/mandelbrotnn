@@ -54,7 +54,12 @@ def example_render():
 def example_train():
     print("Initializing model...")
     
-    model = models.SkipConn(300, 50).cuda() # see src.models for more models
+    # model = models.SkipConn(100, 10).cuda() # see src.models for more models
+    # model = models.HashGrid(hidden_size=400, num_hidden_layers=50).cuda() # see src.models for more models
+
+    # tiny HashGrid for a quick end-to-end test (~1.6M params, trains in seconds)
+    model = models.HashGrid(n_levels=8, log2_hashmap_size=16, n_max=2048,
+                            hidden_size=64, num_hidden_layers=3).cuda()
 
     # show the space before we've learned anything
     # plt.imshow(renderModel(model, 600, 600), vmin=0, vmax=1, cmap='inferno')
@@ -64,7 +69,7 @@ def example_train():
     eval_dataset = MandelbrotDataSet(100000, gpu=True)
 
 
-    train(model, dataset, 10, batch_size=10000, eval_dataset=eval_dataset, oversample=0.1, use_scheduler=True, snapshots_every=50) # train for 20 epochs
+    train(model, dataset, 1, batch_size=10000, eval_dataset=eval_dataset, oversample=0.1, use_scheduler=True, snapshots_every=50) # train for 20 epochs
 
     # show the space again
     # plt.imshow(renderModel(model, 600, 600), cmap='inferno')
@@ -126,7 +131,7 @@ def create_dataset():
 
 if __name__ == "__main__":
     # create_dataset()
-    # example_train()
+    example_train()
     # example_render()
-    example_render_model()
+    # example_render_model()
     # example_train_capture()
