@@ -9,4 +9,4 @@ runs/*
 frames/*
 *.mp4
 scratch.py
-venv/*
+.venv/*
