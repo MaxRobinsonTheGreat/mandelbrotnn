@@ -6,9 +6,12 @@ import matplotlib.pyplot as plt
 
 
 class ImageDataset(Dataset):
-    def __init__(self, image_path, normalize=True):
+    def __init__(self, image_path, normalize=True, grayscale=True):
         # Load image, convert to grayscale and scale pixel values to [0, 1]
-        self.image = Image.open(image_path).convert('L')
+        self.image = Image.open(image_path)
+        if grayscale:
+            self.image = self.image.convert('L')
+        self.grayscale = grayscale
         self.image = ToTensor()(self.image)
         self.normalize = normalize
         self.image = torch.flip(self.image, [1])  # flip along height dimension
@@ -32,17 +35,24 @@ class ImageDataset(Dataset):
         input = torch.tensor([col / (self.width / 2) - 1, row / (self.height / 2) - 1])
 
         # Get pixel value
-        output = self.image[0, row, col]
+        if self.grayscale:
+            output = self.image[0, row, col]
+        else:
+            output = self.image[:, row, col]
 
         return input, output
     
     def display_image(self):
-        # uses the getitem method to get each pixel value and displays the final image. used for debugging
-        image = torch.zeros((self.height, self.width))
-        for i in range(len(self)):
-            row = i // self.width
-            col = i % self.width
-            image[row, col] = self[i][1]
-        plt.imshow(image, cmap='gray')
+        # Check the shape of the image tensor and handle accordingly
+        image = self.image
+        image = torch.flip(image, [1])
+        if len(image.shape) == 3:  # For RGB images (C, H, W)
+            plt.imshow(image.numpy().transpose(1, 2, 0))
+        elif len(image.shape) == 2:  # For grayscale images (H, W)
+            plt.imshow(image.numpy(), cmap='gray')
+        else:
+            raise ValueError(f"Unexpected image shape: {image.shape}")
+        
+        plt.axis('off')
         plt.show()
 

@@ -22,11 +22,12 @@ def trainImage(
         scheduler_gamma=0.5,
         save_every_n_batches=10,
         final_image_scale=-1, # if > 0, will save an extremely high quality image scaled up by this amount
+        grayscale=True,
         plt_color_map='inferno'
         ):
     
     # Create the dataset and data loader
-    dataset = ImageDataset(image_path)
+    dataset = ImageDataset(image_path, grayscale=grayscale)
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     resx, resy = dataset.width, dataset.height
     linspace = torch.stack(torch.meshgrid(torch.linspace(-1, 1, resx), torch.linspace(1, -1, resy)), dim=-1).cuda()
@@ -66,6 +67,7 @@ def trainImage(
             # Save an image of the model every n iterations
             if iteration % save_every_n_batches == 0:
                 os.makedirs(f'./frames/{proj_name}', exist_ok=True)
+                # print(renderModel(model, resx=resx, resy=resy, linspace=linspace, max_gpu=False).shape)
                 plt.imsave(f'./frames/{proj_name}/{frame:05d}.png', renderModel(model, resx=resx, resy=resy, linspace=linspace, max_gpu=False), cmap=plt_color_map, origin='lower')
                 frame += 1
             iteration += 1
@@ -77,6 +79,8 @@ def trainImage(
 
     # compute the loss of the final image
     final_image = renderModel(model, resx=resx, resy=resy, linspace=linspace, max_gpu=False, keep_cuda=True).cpu()
+    if not grayscale:
+        final_image = torch.permute(final_image, (2, 0, 1))
     final_loss = loss_func(final_image, dataset.image).item()
     with open(f'./frames/{proj_name}/stats.txt', 'w') as f:
         f.write(f'Final Loss: {final_loss}\n')
@@ -99,15 +103,16 @@ if __name__ == '__main__':
     model = models.SkipConn(hidden_size=300, num_hidden_layers=15, activation=nn.GELU).cuda()
     # model = models.Fourier(16, hidden_size=200, num_hidden_layers=10, linmap=models.CenteredLinearMap(-1, 1, -1, 1, 2*torch.pi, 2*torch.pi)).cuda()
     trainImage(
-        image_path='DatasetImages/biodiversity.png',
-        proj_name='biodiversity_adam',
+        image_path='DatasetImages/hands_drawing.png',
+        proj_name='hands_drawing',
         model=model,
         lr=0.002,
-        batch_size=8000,
-        num_epochs=100,
+        batch_size=20000,
+        num_epochs=50,
         optimizer='adam',
         scheduler_step=10,
         scheduler_gamma=0.5,
-        save_every_n_batches=20,
-        plt_color_map='viridis',
+        save_every_n_batches=10,
+        grayscale=True,
+        plt_color_map='bone'
     )
