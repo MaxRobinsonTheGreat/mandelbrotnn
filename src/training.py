@@ -3,8 +3,8 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import math
-from src.videomaker import renderModel
-import os, sys
+from src.videomaker import renderModel, renderModelWindow
+import os, sys, datetime
 
 from torch.utils.tensorboard import SummaryWriter
 from logger import Logger
@@ -12,7 +12,7 @@ from logger import Logger
 os.makedirs("./models", exist_ok=True)
 
 
-def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversample=0, eval_dataset=None, savemodelas='autosave.pt', snapshots_every=-1, vm=None):
+def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversample=0, eval_dataset=None, savemodelas='autosave.pt', snapshots_every=-1, vm=None, run_name=None):
     """ 
     Trains the given model on the given dataset for the given number of epochs. Can save the model and
     capture training videos as it goes. 
@@ -30,9 +30,15 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
     vm (VideoMaker): used to capture training images and save them as a mp4.\
         If None, will not save a video capture (this will increase perfomance).\
         Defaults to None.
+    run_name (string): optional label for the TensorBoard run. The run dir is\
+        prefixed with a sortable YYYYMMDD-HHMMSS timestamp so the newest run\
+        sorts last. Defaults to None.
     """
     print("Initializing...")
-    tb = SummaryWriter()
+    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    log_dir = os.path.join("runs", stamp if run_name is None else f"{stamp}_{run_name}")
+    tb = SummaryWriter(log_dir=log_dir)
+    print(f"TensorBoard run: {log_dir}")
     logger = Logger(__file__, dir=tb.log_dir)
     logger.copyFile(sys.argv[0])
 
@@ -40,9 +46,9 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
     logger.createDir('models')
 
     model = model.cuda()
-    optim = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=1e-5)
+    optim = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-5)
     if use_scheduler:
-        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=5, gamma=0.5)
+        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=20, gamma=0.5)
         # I have experimented with other supposedly better schedulers before, they don't work as well
         # try this one if you'd like:
         # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optim, T_0=20)
@@ -90,7 +96,7 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
             # loss = torch.mean(2 * (1-(1/(torch.abs(outputs - pred)+1))))
             # loss = torch.mean(torch.sqrt(torch.abs(outputs**2 - pred**2)))
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
+            # torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
             optim.step()
             tot_loss += loss.item()
 
@@ -104,7 +110,7 @@ def train(model, dataset, epochs, batch_size=1000, use_scheduler=False, oversamp
             # scheduler.step()
 
             if snapshots_every != -1 and tot_iterations%snapshots_every == 0:
-                tb.add_image('sample', renderModel(model, 960, 544, max_gpu=True).data, tot_iterations)
+                tb.add_image('sample', renderModelWindow(model, width=960), tot_iterations, dataformats='HW')
                 if eval_dataset is not None:
                     tb.add_scalar('Loss/eval', evaluate(model, eval_dataset, batch_size), tot_iterations)
         loop.close()

@@ -23,15 +23,29 @@ zoom_speed = 0.0025
 final_resx = 1920
 final_resy = 1088
 
-model_name = 'fourier_256_400_50'
-video_name = 'zoom_in_' + model_name
+# model_name = 'fourier_256_400_50'
+# video_name = 'zoom_in_' + model_name
+# max_gpu = True
+
+#load model
+# linmap = models.CenteredLinearMap(x_size=torch.pi*2, y_size=torch.pi*2)
+# model = models.Fourier(fourier_order=256, hidden_size=400, num_hidden_layers=50, linmap=linmap).cuda()
+# model.load_state_dict(torch.load('./models/'+model_name+'.pt')) # you need to have a model with this name
+
+model_name = 'champion'
+video_name = 'zoom_in_champion_' + model_name
 max_gpu = True
 
 #load model
-linmap = models.CenteredLinearMap(x_size=torch.pi*2, y_size=torch.pi*2)
-model = models.Fourier(fourier_order=256, hidden_size=400, num_hidden_layers=50, linmap=linmap).cuda()
+model = models.HashGrid(n_levels=13, n_features=2, log2_hashmap_size=24,
+                            n_min=16, n_max=65536, hidden_size=128, num_hidden_layers=4).cuda()
 model.load_state_dict(torch.load('./models/'+model_name+'.pt')) # you need to have a model with this name
 
+total_params = sum(p.numel() for p in model.parameters())
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+print(f"Total params: {total_params:,}")
+print(f"Trainable params: {trainable_params:,}")
 
 frames_dir = f'frames/{video_name}'
 if not os.path.exists(frames_dir):

@@ -20,6 +20,7 @@ def trainImage(
         optimizer='adam',
         scheduler_step=5,
         scheduler_gamma=0.5,
+        grad_clip=None, # max grad norm; None or <=0 disables clipping
         save_every_n_batches=10,
         final_image_scale=-1, # if > 0, will save an extremely high quality image scaled up by this amount
         grayscale=True,
@@ -61,7 +62,8 @@ def trainImage(
             # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
+            if grad_clip is not None and grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
             optimizer.step()
 
             # Save an image of the model every n iterations
@@ -82,6 +84,9 @@ def trainImage(
     if not grayscale:
         final_image = torch.permute(final_image, (2, 0, 1))
     final_loss = loss_func(final_image, dataset.image).item()
+
+    torch.save(model.state_dict(), f'./models/{proj_name}.pt')
+
     with open(f'./frames/{proj_name}/stats.txt', 'w') as f:
         f.write(f'Final Loss: {final_loss}\n')
         f.write(f'Time taken: {time.time() - start_time:.2f} seconds\n')
@@ -100,19 +105,21 @@ def trainImage(
 
 if __name__ == '__main__':
     # model = models.Simple(hidden_size=200, num_hidden_layers=10, activation=nn.LeakyReLU).cuda()
-    model = models.SkipConn(hidden_size=300, num_hidden_layers=15, activation=nn.GELU).cuda()
-    # model = models.Fourier(16, hidden_size=200, num_hidden_layers=10, linmap=models.CenteredLinearMap(-1, 1, -1, 1, 2*torch.pi, 2*torch.pi)).cuda()
+    # model = models.HashGrid(n_levels=8, log2_hashmap_size=16, n_max=2048,
+    #                         hidden_size=64, num_hidden_layers=3).cuda()
+    model = models.Fourier(64, hidden_size=200, num_hidden_layers=15, linmap=models.CenteredLinearMap(-1, 1, -1, 1, 2*torch.pi, 2*torch.pi)).cuda()
     trainImage(
         image_path='DatasetImages/hands_drawing.png',
-        proj_name='hands_drawing',
+        proj_name='hands_drawing_fourier',
         model=model,
         lr=0.002,
         batch_size=20000,
-        num_epochs=50,
+        num_epochs=15,
         optimizer='adam',
-        scheduler_step=10,
+        scheduler_step=2,
         scheduler_gamma=0.5,
-        save_every_n_batches=10,
+        grad_clip=None,
+        save_every_n_batches=3,
         grayscale=True,
         plt_color_map='bone'
     )

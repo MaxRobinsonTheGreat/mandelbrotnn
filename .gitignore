@@ -10,3 +10,4 @@ frames/*
 *.mp4
 scratch.py
 .venv/*
+runs_archive/*

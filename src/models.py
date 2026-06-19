@@ -1,6 +1,12 @@
 import torch
 import torch.nn as nn
-import math
+
+# re-export hash model so we can keep it in a separate file
+def __getattr__(name):
+	if name in ("HashGrid", "HashGridEncoding"):
+		from src import hash_model
+		return getattr(hash_model, name)
+	raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 class Binary(nn.Module):
     def __init__(self):
@@ -131,7 +137,7 @@ class Fourier2D(nn.Module):
 
 
 class CenteredLinearMap():
-	def __init__(self, xmin=-2.5, xmax=1.0, ymin=-1.1, ymax=1.1, x_size=None, y_size=None):
+	def __init__(self, xmin=-2.65, xmax=1.15, ymin=-1.2, ymax=1.2, x_size=None, y_size=None):
 		if x_size is not None:
 			x_m = x_size/(xmax - xmin)
 		else: 
@@ -150,143 +156,6 @@ class CenteredLinearMap():
 		m = self.m.cuda()
 		b = self.b.cuda()
 		return m*x + b
-
-
-_HASH_PRIMES = (1, 2654435761)
-
-
-class HashGridEncoding(nn.Module):
-	"""
-	Multiresolution hash-grid encoding (Instant-NGP, Mueller et al. 2022).
-
-	A stack of `n_levels` learnable feature grids at geometrically-spaced
-	resolutions. Each input point is looked up in every grid via bilinear
-	interpolation of its 4 surrounding cell corners; coarse levels index the
-	table directly, fine levels collide through a spatial hash. The per-level
-	features are concatenated into a `n_levels * n_features` vector that a small
-	MLP decodes. Inputs must be in [0,1]^2.
-
-	Parameters:
-	n_levels (int): number of resolution levels
-	n_features (int): feature channels stored per grid entry
-	log2_hashmap_size (int): log2 of the max entries per level (table size cap)
-	n_min (int): coarsest grid resolution
-	n_max (int): finest grid resolution
-	init_scale (float): grid entries are initialized uniform in [-init_scale, init_scale]
-	"""
-	def __init__(self, n_levels=12, n_features=2, log2_hashmap_size=24, n_min=16, n_max=32768,
-				 init_scale=1e-4):
-		super().__init__()
-		self.n_levels = n_levels
-		self.n_features = n_features
-		self.T = 1 << log2_hashmap_size
-		b = (n_max / n_min) ** (1.0 / (n_levels - 1))
-		res = [int(round(n_min * b ** l)) for l in range(n_levels)]
-		self._res = res                      # plain python ints -> no per-forward CUDA sync
-		self.tables = nn.ParameterList()
-		self.sizes = []
-		self._direct = []                    # whether level indexes directly (no hash)
-		for l in range(n_levels):
-			N = res[l]
-			size = min(N * N, self.T)
-			self.sizes.append(size)
-			self._direct.append(N * N <= size)
-			t = nn.Parameter(torch.empty(size, n_features).uniform_(-init_scale, init_scale))
-			self.tables.append(t)
-		self.out_dim = n_levels * n_features
-
-	def _idx(self, ix, iy, size, N, direct):
-		# direct index when the grid fits in the table, else spatial hash
-		if direct:
-			return (iy * N + ix) % size
-		h = (ix * _HASH_PRIMES[0]) ^ (iy * _HASH_PRIMES[1])
-		return h % size
-
-	def forward(self, x):
-		# x in [0,1]^2
-		feats = []
-		for l in range(self.n_levels):
-			N = self._res[l]
-			size = self.sizes[l]
-			direct = self._direct[l]
-			xs = x * (N - 1)
-			x0 = torch.floor(xs).long()
-			xf = xs - x0.float()
-			ix0, iy0 = x0[:, 0], x0[:, 1]
-			ix1 = (ix0 + 1).clamp(max=N - 1)
-			iy1 = (iy0 + 1).clamp(max=N - 1)
-			ix0 = ix0.clamp(0, N - 1)
-			iy0 = iy0.clamp(0, N - 1)
-			fx = xf[:, 0:1]
-			fy = xf[:, 1:2]
-			tbl = self.tables[l]
-			c00 = tbl[self._idx(ix0, iy0, size, N, direct)]
-			c10 = tbl[self._idx(ix1, iy0, size, N, direct)]
-			c01 = tbl[self._idx(ix0, iy1, size, N, direct)]
-			c11 = tbl[self._idx(ix1, iy1, size, N, direct)]
-			c0 = c00 * (1 - fx) + c10 * fx
-			c1 = c01 * (1 - fx) + c11 * fx
-			feats.append(c0 * (1 - fy) + c1 * fy)
-		return torch.cat(feats, dim=1)
-
-
-class HashGrid(nn.Module):
-	"""
-	Instant-NGP multiresolution hash-grid encoding + small MLP decoder.
-
-	The strongest architecture found by the fractalsearch experiments: learnable
-	feature grids at many scales carry the spatial detail while a tiny GELU MLP
-	decodes them. A universal function approximator (learnable interpolant + MLP)
-	that fits dense 2D fields with structure at every scale far better than a
-	plain coordinate MLP.
-
-	Inputs are raw (x, y) coordinates; they are normalized to [0,1]^2 internally
-	using the [xmin,xmax]x[ymin,ymax] window (defaults to the standard Mandelbrot
-	view) before the grid lookup.
-
-	Parameters:
-	n_levels (int): number of resolution levels in the hash grid
-	n_features (int): feature channels per grid entry
-	log2_hashmap_size (int): log2 of the per-level table size cap
-	n_min (int): coarsest grid resolution
-	n_max (int): finest grid resolution
-	hidden_size (int): width of the decoder MLP
-	num_hidden_layers (int): number of hidden layers in the decoder MLP
-	in_size (int): input dimension size, default 2 (must be 2)
-	out_size (int): output dimension size, default 1
-	activation (nn.Module): decoder MLP activation, default nn.GELU
-	init_scale (float): hash-grid entry init range, default 1e-4
-	xmin/xmax/ymin/ymax (float): input window mapped to [0,1]^2
-	"""
-	def __init__(self, n_levels=12, n_features=2, log2_hashmap_size=24, n_min=16, n_max=32768,
-				 hidden_size=128, num_hidden_layers=4, in_size=2, out_size=1, linmap=None,
-				 activation=nn.GELU, init_scale=1e-4,
-				 xmin=-2.5, xmax=1.0, ymin=-1.1, ymax=1.1):
-		super().__init__()
-		assert in_size == 2, "HashGrid is 2D-specific (bilinear interpolation over x, y)"
-		self.enc = HashGridEncoding(n_levels, n_features, log2_hashmap_size, n_min, n_max, init_scale)
-		dims = [self.enc.out_dim] + [hidden_size] * (num_hidden_layers - 1) + [out_size]
-		blocks = []
-		for i in range(len(dims) - 2):
-			blocks += [nn.Linear(dims[i], dims[i + 1]), activation()]
-		blocks += [nn.Linear(dims[-2], dims[-1])]
-		self.net = nn.Sequential(*blocks)
-		self.tanh = nn.Tanh()
-		self._linmap = linmap
-		self._cx, self._cy = xmin, ymin
-		self._w, self._h = (xmax - xmin), (ymax - ymin)
-
-	def _norm(self, x):
-		nx = (x[:, 0:1] - self._cx) / self._w
-		ny = (x[:, 1:2] - self._cy) / self._h
-		return torch.cat([nx, ny], dim=1).clamp(0.0, 1.0)
-
-	def forward(self, x):
-		if self._linmap:
-			x = self._linmap.map(x)
-		e = self.enc(self._norm(x))
-		return (self.tanh(self.net(e)) + 1) / 2
-
 
 # Taylor features, x, x^2, x^3, ...
 # surprisingly terrible

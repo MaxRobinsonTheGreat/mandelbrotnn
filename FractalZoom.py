@@ -35,7 +35,7 @@ def main():
 
     for i in tqdm(range(args.frames)):
         # Generate image and save it to a file
-        image = renderMandelbrot(args.resx, args.resy, xmin=xmin, xmax=xmax, yoffset=yoffset, max_depth=args.max_depth, gpu=True)
+        image = renderMandelbrot(args.resx, args.resy, xmin=xmin, xmax=xmax, yoffset=yoffset, max_depth=args.max_depth, gpu=True, target='periodic')
         plt.imsave(f'{frames_dir}/frame_{i:03d}.png', image, vmin=0, vmax=1, cmap='gist_heat')
 
         # Update coordinates for zoom
@@ -50,8 +50,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # xmin = -2.417156607
+    # xmax = -0.417156607
     # python3 FractalZoom.py 3840 2160 6000 --xmin -1.86520494 --xmax 1.53479506 --yoffset 1.039049255 --max_depth 1500 --zoom_speed 0.0025 --video_name 4k_zoom
     # python3 FractalZoom.py 3840 2160 50 --xmin -1.86520494 --xmax 1.53479506 --yoffset 1.039049255 --max_depth 1500 --zoom_speed 0.01 --video_name test2
     # python3 FractalZoom.py 960 544 2000 --xmin -2.417156607 --xmax -0.417156607 --yoffset 0.0 --max_depth 500 --zoom_speed 0.0025 --video_name zoom_comparison_real
     # python3 FractalZoom.py 960 544 30 --xmin -3.48318785 --xmax 0.516812146 --yoffset 0.0 --max_depth 1500 --zoom_speed 0.25 --video_name 4k_zoom2
-
+    # python3 FractalZoom.py 3840 2160 2000 --xmin -2.42 --xmax -0.417156607 --yoffset 0 --max_depth 1500 --zoom_speed 0.01 --video_name 4k_zoom3
+    # python3 FractalZoom.py 480 272 2000 --xmin -2.42 --xmax -0.417156607 --yoffset 0 --max_depth 1500 --zoom_speed 0.01 --video_name zoom_test3
